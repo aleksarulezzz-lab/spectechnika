@@ -1,0 +1,10 @@
+{
+  "extraKnownMarketplaces": {
+    "roomwalk": {
+      "source": { "source": "github", "repo": "Aironzak/instagram" }
+    }
+  },
+  "enabledPlugins": {
+    "roomwalk@roomwalk": true
+  }
+}

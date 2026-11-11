@@ -1,0 +1,50 @@
+# Секреты и ключи — никогда не коммитить
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+id_rsa*
+id_ed25519*
+secrets/
+credentials*.json
+*token*.json
+.roomwalk/
+.mcp.json
+.claude/settings.local.json
+
+# Временные файлы и сборка
+tmp/
+temp/
+*.tmp
+*.log
+*.swp
+*~
+.cache/
+dist/
+build/
+.next/
+out/
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Сгенерированные медиа (кадры Higgsfield — большие, пересобираются)
+frames/
+renders/
+*.mp4
+*.mov
+
+# Исходные PDF клиента лежат в файлах проекта, не в репозитории
+*.pdf
+
+# ОС и редакторы
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
