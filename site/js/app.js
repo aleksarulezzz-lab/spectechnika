@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { models, cranes, heroModelId } from './models.js';
+import { buildMachine } from './machines.js';
 
 const fmtMln = (rub) => (rub / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + ' млн ₽';
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -48,9 +50,10 @@ function initHero() {
   scene.add(rig);
 
   const TARGET_LENGTH = 4.4; // длина машины в единицах сцены
-  let modelHeight = 2;
+  let modelHeight = 2, modelScale = 1, driveFn = null;
 
-  function mount(object, yaw = 0) {
+  function mount(object, yaw = 0, drive = null) {
+    driveFn = drive;
     spin.clear();
     const holder = new THREE.Group();
     holder.add(object);
@@ -60,6 +63,7 @@ function initHero() {
     const size = box.getSize(new THREE.Vector3());
     const s = TARGET_LENGTH / Math.max(size.x, size.z);
     holder.scale.setScalar(s);
+    modelScale = s;
     holder.updateMatrixWorld(true);
     const b2 = new THREE.Box3().setFromObject(holder);
     const c = b2.getCenter(new THREE.Vector3());
@@ -69,11 +73,11 @@ function initHero() {
     spin.add(holder);
   }
 
+  // Своя модель с крутящимися гусеницами; если появится GLB — подменим им.
+  const own = buildMachine(heroData.kind, heroData.look);
+  mount(own.group, 0, own.drive);
   if (heroData.glb) {
-    new GLTFLoader().load(heroData.glb, (g) => mount(g.scene, heroData.heroYaw || 0), undefined,
-      () => mount(buildDraftExcavator()));
-  } else {
-    mount(buildDraftExcavator());
+    new GLTFLoader().load(heroData.glb, (g) => mount(g.scene, heroData.heroYaw || 0), undefined, () => {});
   }
 
   // Размеры и камера
@@ -126,7 +130,7 @@ function initHero() {
   resetBtn.addEventListener('click', () => { targetYaw = 0; targetPitch = 0; resetBtn.hidden = true; });
 
   // Анимация
-  let x = null, travelled = 0;
+  let x = null, travelled = 0, odometer = 0;
   const tmp = new THREE.Vector3();
   function frame() {
     const start = -viewHalfW + TARGET_LENGTH * 0.62;
@@ -136,6 +140,8 @@ function initHero() {
     const prevX = x;
     x += (targetX - x) * (reduceMotion ? 1 : 0.1);
     travelled += Math.abs(x - prevX);
+    odometer += x - prevX; // со знаком: назад по скроллу — гусеницы крутятся назад
+    if (driveFn) driveFn(odometer / modelScale);
 
     rig.position.x = x;
     // лёгкое покачивание на ходу
@@ -165,49 +171,81 @@ function initHero() {
   requestAnimationFrame(frame);
 }
 
-// Черновая модель из примитивов — показывается, пока нет GLB из Higgsfield.
-function buildDraftExcavator() {
-  const g = new THREE.Group();
-  const orange = new THREE.MeshStandardMaterial({ color: 0xe8731a, roughness: 0.45, metalness: 0.25 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x23272a, roughness: 0.8, metalness: 0.2 });
-  const steel = new THREE.MeshStandardMaterial({ color: 0x55595c, roughness: 0.5, metalness: 0.6 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0x1b2a33, roughness: 0.1, metalness: 0.8 });
-  const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
+/* ---------------- 3D в карточках ---------------- */
+function makeCardViewer() {
+  let renderer = null, scene, camera, controls, current = null, owner = null, raf = 0, t = 0;
+  const cache = new Map();
 
-  // гусеницы
-  for (const z of [-1.15, 1.15]) {
-    const shape = new THREE.Shape();
-    const L = 4.6, r = 0.5;
-    shape.absarc(-L / 2 + r, r, r, Math.PI / 2, Math.PI * 1.5, false);
-    shape.absarc(L / 2 - r, r, r, -Math.PI / 2, Math.PI / 2, false);
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.6, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04, bevelSegments: 2 });
-    const t = new THREE.Mesh(geo, dark); t.position.set(0, 0, z - 0.3); g.add(t);
-    for (let i = -3; i <= 3; i++) box(0.12, 0.08, 0.66, steel, i * 0.6, 1.0, z);
+  function init() {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.shadowMap.enabled = true;
+    renderer.domElement.className = 'card__gl';
+    scene = new THREE.Scene();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xb9c3c6, 0.5));
+    const sun = new THREE.DirectionalLight(0xffffff, 2);
+    sun.position.set(5, 10, 7); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+    Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6 });
+    scene.add(sun);
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(7, 48), new THREE.ShadowMaterial({ opacity: 0.22 }));
+    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+    scene.add(ground);
+    camera = new THREE.PerspectiveCamera(30, 4 / 3, 0.1, 100);
+    controls = new OrbitControls(camera, renderer.domElement);
+    Object.assign(controls, { enableZoom: false, enablePan: false, enableDamping: true, autoRotate: !reduceMotion, autoRotateSpeed: 2.2,
+      minPolarAngle: 0.6, maxPolarAngle: 1.45 });
   }
-  box(3.4, 0.35, 1.8, dark, 0, 0.72, 0); // рама
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.18, 32), steel); ring.position.set(0, 1.0, 0); g.add(ring);
-  // поворотная платформа
-  box(3.6, 1.0, 2.6, orange, -0.35, 1.6, 0);
-  box(1.0, 0.9, 2.6, orange, -2.0, 1.55, 0).geometry.translate(0, 0, 0); // противовес
-  box(1.6, 0.25, 1.1, dark, -1.0, 2.2, 0.55); // капот
-  // кабина
-  box(1.2, 1.35, 1.0, orange, 0.75, 2.75, 0.75);
-  box(1.08, 0.95, 1.02, glass, 0.8, 2.85, 0.75);
-  // стрела
-  const boom = box(3.2, 0.42, 0.5, orange, 0, 0, -0.2);
-  boom.geometry.translate(1.6, 0, 0); boom.position.set(0.9, 2.2, -0.2); boom.rotation.z = 0.62;
-  const boom2 = box(1.9, 0.38, 0.46, orange, 0, 0, -0.2);
-  boom2.geometry.translate(0.95, 0, 0); boom2.position.set(3.45, 4.0, -0.2); boom2.rotation.z = -0.45;
-  // рукоять
-  const arm = box(2.6, 0.32, 0.4, orange, 0, 0, -0.2);
-  arm.geometry.translate(1.3, 0, 0); arm.position.set(5.1, 3.2, -0.2); arm.rotation.z = -1.25;
-  // ковш
-  const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.9, 20, 1, false, 0, Math.PI), dark);
-  bucket.rotation.x = Math.PI / 2; bucket.rotation.z = -0.4; bucket.position.set(5.85, 0.8, -0.2); g.add(bucket);
-  // гидроцилиндр
-  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.9, 12), steel);
-  cyl.position.set(1.7, 2.6, 0.2); cyl.rotation.z = -1.05; g.add(cyl);
-  return g;
+
+  function get(m) {
+    if (!cache.has(m.id)) {
+      const mach = buildMachine(m.kind, m.look);
+      const holder = new THREE.Group();
+      holder.add(mach.group);
+      const b = new THREE.Box3().setFromObject(holder);
+      const c = b.getCenter(new THREE.Vector3());
+      holder.position.set(-c.x, -b.min.y, -c.z);
+      const size = b.getSize(new THREE.Vector3());
+      cache.set(m.id, { holder, drive: mach.drive, radius: size.length() / 2, height: size.y });
+    }
+    return cache.get(m.id);
+  }
+
+  function loop() {
+    raf = requestAnimationFrame(loop);
+    t += 1 / 60;
+    if (current && !reduceMotion) current.drive(t * 1.6); // гусеницы и колёса крутятся, пока смотрят
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  return {
+    attach(media, m) {
+      if (!renderer) init();
+      if (current) scene.remove(current.holder);
+      current = get(m);
+      scene.add(current.holder);
+      owner = media;
+      media.appendChild(renderer.domElement);
+      const w = media.clientWidth, h = media.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      const dist = current.radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.82;
+      const target = new THREE.Vector3(0, current.height * 0.42, 0);
+      controls.target.copy(target);
+      camera.position.set(dist * 0.62, current.height * 0.42 + dist * 0.3, dist * 0.72);
+      camera.updateProjectionMatrix();
+      controls.update();
+      if (!raf) loop();
+    },
+    detach(media) {
+      if (owner !== media) return;
+      cancelAnimationFrame(raf); raf = 0; owner = null;
+    },
+  };
 }
 
 /* ---------------- Каталог ---------------- */
@@ -231,7 +269,7 @@ function cardHTML(m) {
   return `
   <article class="card" data-group="${m.group}" data-id="${m.id}">
     <div class="card__media" data-glb="${m.glb || ''}">
-      <span class="card__tag">2025 · после ППП</span>
+      <span class="card__tag">2025 · готова к работе</span>
       <span class="card__tag card__tag--3d">${m.glb ? '3D — наведите' : '3D скоро'}</span>
       <img src="${m.img}" alt="${m.brand} ${m.name} — ${m.type}" loading="lazy">
     </div>
@@ -239,12 +277,12 @@ function cardHTML(m) {
       <p class="card__type">${m.brand} · ${m.type}</p>
       <h3 class="card__name">${m.name}</h3>
       <div class="badges">${m.badges.map((b) => `<span class="badge">${b}</span>`).join('')}</div>
-      <div class="card__price tnum">от ${fmtMln(m.price)} <small>по КП</small></div>
+      <div class="card__price tnum">от ${fmtMln(m.price)} <small>за единицу</small></div>
       <p class="card__stock"><span class="dot"></span>В наличии: ${m.stock} шт. · Набережные Челны</p>
     </div>
     <div class="bookzone">${bookHTML(m)}</div>
     <div class="card__actions">
-      <a class="btn btn--cta" href="#lead" data-model="${m.name}">КП за 15 минут</a>
+      <a class="btn btn--cta" href="#lead" data-model="${m.name}">Получить предложение</a>
       <a class="btn btn--line" href="#lead" data-model="${m.name}" data-intent="leasing">Лизинг</a>
     </div>
   </article>`;
@@ -268,40 +306,44 @@ function initCatalog() {
     book.addEventListener('blur', () => set(false));
   });
 
-  // Фото → 3D при наведении (если модель есть), иначе — лёгкий наклон фото.
+  // Фото → 3D при наведении (на телефоне — по нажатию). Реальный GLB — через model-viewer,
+  // иначе своя модель: один общий WebGL-рендерер переезжает в карточку под курсором.
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const viewer = makeCardViewer();
   grid.querySelectorAll('.card__media').forEach((media) => {
-    const glb = media.dataset.glb;
-    const img = media.querySelector('img');
-    if (glb) {
-      let viewer = null;
-      const show = () => {
-        if (!viewer) {
-          viewer = document.createElement('model-viewer');
-          Object.assign(viewer, { src: glb, alt: img.alt });
-          viewer.setAttribute('camera-controls', '');
-          viewer.setAttribute('auto-rotate', '');
-          viewer.setAttribute('auto-rotate-delay', '0');
-          viewer.setAttribute('rotation-per-second', '24deg');
-          viewer.setAttribute('interaction-prompt', 'none');
-          viewer.setAttribute('shadow-intensity', '1');
-          viewer.setAttribute('exposure', '1.05');
-          viewer.setAttribute('camera-orbit', '35deg 75deg auto');
-          viewer.setAttribute('touch-action', 'pan-y');
-          media.appendChild(viewer);
+    const card = media.closest('.card');
+    const m = models.find((x) => x.id === card.dataset.id);
+    const tag = media.querySelector('.card__tag--3d');
+    tag.textContent = touch ? '3D — нажмите' : '3D — наведите';
+    if (m.glb) {
+      let mv = null;
+      media._show = () => {
+        if (!mv) {
+          mv = document.createElement('model-viewer');
+          Object.assign(mv, { src: m.glb, alt: `${m.brand} ${m.name}` });
+          for (const [k, v] of Object.entries({ 'camera-controls': '', 'auto-rotate': '', 'auto-rotate-delay': '0', 'rotation-per-second': '24deg',
+            'interaction-prompt': 'none', 'shadow-intensity': '1', exposure: '1.05', 'camera-orbit': '35deg 75deg auto', 'touch-action': 'pan-y' })) mv.setAttribute(k, v);
+          media.appendChild(mv);
         }
         media.classList.add('is-3d');
       };
-      media.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') show(); });
-      media.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') media.classList.remove('is-3d'); });
-      media.addEventListener('click', () => (media.classList.contains('is-3d') ? media.classList.remove('is-3d') : show()));
-    } else if (!reduceMotion) {
-      media.addEventListener('pointermove', (e) => {
-        const r = media.getBoundingClientRect();
-        const nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
-        img.style.transform = `rotateY(${nx * 10}deg) rotateX(${-ny * 8}deg) scale(1.05)`;
-      });
-      media.addEventListener('pointerleave', () => { img.style.transform = ''; });
+      media._hide = () => media.classList.remove('is-3d');
+    } else {
+      media._show = () => { viewer.attach(media, m); media.classList.add('is-3d'); };
+      media._hide = () => { media.classList.remove('is-3d'); viewer.detach(media); };
     }
+    media.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') media._show(); });
+    media.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') media._hide(); });
+    media.addEventListener('click', () => {
+      if (media.classList.contains('is-3d')) return;
+      grid.querySelectorAll('.card__media.is-3d').forEach((o) => o._hide());
+      media._show();
+    });
+  });
+  // На телефоне 3D закрывается нажатием вне карточки.
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    grid.querySelectorAll('.card__media.is-3d').forEach((o) => { if (!o.contains(e.target)) o._hide(); });
   });
 
   // Фильтры

@@ -137,6 +137,25 @@ export const models = [
   },
 ];
 
+// Своё 3D (js/machines.js): тип шасси и внешний вид. Стилизация по цвету бренда — не фото машины.
+const JY = { color: 0xe8731a, accent: 0x262b2f, brand: 'Jonyang' };
+const EN = { color: 0xf2b705, accent: 0x262b2f, rim: 0xf2b705, brand: 'Ensign' };
+const looks = {
+  'jy625e': ['crawler', { ...JY, size: 1 }],
+  'jy636e': ['crawler', { ...JY, size: 1.12 }],
+  'jyl615f-e': ['wheeled', { ...JY, size: 0.8 }],
+  'jyl621e': ['wheeled', { ...JY, size: 0.9 }],
+  'jy220c': ['dozer', { ...JY, color: 0xe8a21a }],
+  'yx636': ['loader', { ...EN, size: 0.85, bucketWidth: 2.4 }],
+  'yx638': ['loader', { ...EN, size: 0.9, bucketWidth: 2.5 }],
+  'yx646': ['loader', { ...EN, size: 0.95, bucketWidth: 2.7 }],
+  'yx656': ['loader', { ...EN, size: 1.05, bucketWidth: 2.8 }],
+  'yx657': ['loader', { ...EN, size: 1.08, bucketWidth: 2.9 }],
+  'yx660hev': ['loader', { ...EN, color: 0x2a8cc8, rim: 0xdfe4e6, size: 1.1, bucketWidth: 3.0, hybrid: true }],
+  '388t': ['backhoe', { color: 0x3a4248, accent: 0x1e2226, rim: 0xf28c1e, brand: 'Shanmon' }],
+};
+for (const m of models) { const [kind, look] = looks[m.id]; m.kind = kind; m.look = look; }
+
 // Краны Junton — проходят сертификацию, только предзаказ (см. CLAUDE.md).
 export const cranes = [
   { id: 'jtc25g5', name: 'Junton JTC25G5', img: 'assets/img/jtc25g5.jpg', facts: ['25 т', 'Стрела 43 + 8 м', '230 кВт'] },
