@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ССБ-Инжиниринг — спецтехника в наличии</title>
+  <meta name="description" content="Экскаваторы, бульдозеры и погрузчики Jonyang, Ensign, Shanmon 2025 года в наличии в Набережных Челнах. Цены с сайта, КП за 15 минут, расчёт лизинга.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    } }
+  </script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="#top">ССБ<span>-Инжиниринг</span></a>
+    <nav class="topnav">
+      <a href="#catalog">Техника</a>
+      <a href="#service">Сервис</a>
+      <a href="#how">Как купить</a>
+    </nav>
+    <a class="phone" href="tel:88002222165">8-800-2222-165</a>
+    <a class="btn btn--cta btn--sm" href="#lead">КП за 15 минут</a>
+  </header>
+
+  <main id="top">
+    <!-- Первый экран: экскаватор проезжает по экрану по мере прокрутки, мышью его можно вращать -->
+    <section class="hero" id="hero">
+      <div class="hero__sticky">
+        <div class="hero__stage" id="heroStage">
+          <canvas id="heroCanvas" aria-label="3D-модель экскаватора Jonyang JY625E"></canvas>
+        </div>
+
+        <div class="hero__copy">
+          <p class="eyebrow">Jonyang · Ensign · Shanmon · 2025 г.</p>
+          <h1>Китайские экскаваторы, бульдозеры и погрузчики в наличии — с сервисом и лизингом</h1>
+          <p class="hero__lead">Стоянка и склад запчастей 4 га в Набережных Челнах. Цены на сайте — те же, что в КП.</p>
+          <div class="hero__cta">
+            <a class="btn btn--cta" href="#lead" data-model="JY625E">КП за 15 минут</a>
+            <a class="btn btn--ghost" href="#lead" data-intent="leasing">Рассчитать лизинг</a>
+          </div>
+        </div>
+
+        <div class="hero__plate" id="heroPlate">
+          <div class="hero__plate-name">Jonyang JY625E</div>
+          <div class="hero__plate-price">от 10,8 млн ₽</div>
+          <div class="hero__plate-meta"><span class="dot"></span>14 шт. на стоянке</div>
+        </div>
+
+        <ul class="hero__stats">
+          <li><b id="stockTotal">38</b><span>машин на стоянке</span></li>
+          <li><b>4 га</b><span>площадка и склад ЗИП</span></li>
+          <li><b>15 мин</b><span>на коммерческое предложение</span></li>
+        </ul>
+
+        <p class="hero__hint" id="heroHint">Крутите колесо — машина поедет. Потяните мышью — повернёте её.</p>
+        <button class="hero__reset" id="heroReset" type="button" hidden>Вернуть ракурс</button>
+      </div>
+    </section>
+
+    <section class="trust" id="service">
+      <div class="wrap trust__grid">
+        <article><h3>Запчасти в наличии — не только расходники</h3><p>Склад ЗИП рядом со стоянкой. Двигатели Cummins и Weichai, гидравлика Kawasaki и Nabtesco — узлы, которые знает любой механик.</p></article>
+        <article><h3>Приезжайте и смотрите</h3><p>Техника стоит на нашей площадке в Набережных Челнах. Покажем машину вживую или по видеозвонку.</p></article>
+        <article><h3>Сразу в работу</h3><p>Предпродажная подготовка пройдена. Помогаем с ЭПСМ и постановкой на учёт в Гостехнадзоре.</p></article>
+      </div>
+    </section>
+
+    <section class="catalog" id="catalog">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Техника в наличии</h2>
+          <p>Наведите на фото — модель можно повернуть. Наведите на книгу — откроются характеристики.</p>
+        </div>
+        <div class="filters" id="filters" role="tablist">
+          <button class="chip is-active" data-group="all">Вся техника</button>
+          <button class="chip" data-group="excavator">Экскаваторы</button>
+          <button class="chip" data-group="loader">Погрузчики</button>
+          <button class="chip" data-group="dozer">Бульдозеры</button>
+          <button class="chip" data-group="backhoe">Экскаваторы-погрузчики</button>
+        </div>
+        <div class="grid" id="grid"></div>
+      </div>
+    </section>
+
+    <section class="cranes">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Автокраны Junton — предзаказ</h2>
+          <p>Краны проходят сертификацию. Оставьте заявку — зафиксируем очередь и сообщим о поставке.</p>
+        </div>
+        <div class="cranes__grid" id="cranes"></div>
+      </div>
+    </section>
+
+    <section class="how" id="how">
+      <div class="wrap">
+        <h2>Как купить</h2>
+        <ol class="steps">
+          <li><b>Заявка</b><span>Звонок, мессенджер или форма</span></li>
+          <li><b>КП за 15 минут</b><span>Цена, наличие, сроки отгрузки</span></li>
+          <li><b>Показ</b><span>На стоянке или по видеозвонку</span></li>
+          <li><b>Договор и оплата</b><span>Лизинг через партнёров или по договорённости</span></li>
+          <li><b>Отгрузка</b><span>Помогаем с ЭПСМ и учётом</span></li>
+          <li><b>Первое ТО</b><span>Сервис рядом, ЗИП на складе</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="lead" id="lead">
+      <div class="wrap lead__inner">
+        <div>
+          <h2>Получите КП за 15 минут</h2>
+          <p>Пришлём цену, фото и видео машины со стоянки и предварительный расчёт лизинга.</p>
+          <p class="lead__phone"><a href="tel:88002222165">8-800-2222-165</a><br><a href="mailto:sale@ssb-inj.ru">sale@ssb-inj.ru</a></p>
+        </div>
+        <form class="form" id="leadForm" novalidate>
+          <label>Модель
+            <select name="model" id="leadModel"></select>
+          </label>
+          <label>Телефон
+            <input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 (___) ___-__-__" required>
+          </label>
+          <label>Куда прислать КП
+            <select name="channel">
+              <option>Позвонить</option><option>WhatsApp</option><option>Telegram</option><option>MAX</option><option>E-mail</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" name="leasing" id="leadLeasing"> Нужен расчёт лизинга</label>
+          <button class="btn btn--cta" type="submit">Получить КП</button>
+          <p class="form__note">Нажимая кнопку, вы соглашаетесь на обработку персональных данных.</p>
+          <p class="form__ok" id="leadOk" hidden>Спасибо! Менеджер свяжется с вами в течение 15 минут в рабочее время.</p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>ООО «ССБ-Инжиниринг» · ИНН 9721166249 · дилер и сервисный центр в сети официального дистрибьютора Jonyang в РФ, ООО «Торна»</p>
+      <p>Цены по КП от 29.06.2026. Не является публичной офертой. 3D-модели — иллюстрация, реальные фото техники в карточках.</p>
+    </div>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
